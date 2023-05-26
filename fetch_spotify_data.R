@@ -138,7 +138,15 @@ parse_track_data <- function(track_list) {
                 unnest_wider(artists) %>%
                 select(track_name, track_id, popularity, artist_names = name, artist_ids = id, album) %>%
                 unnest_wider(album) %>%
-                select(track_name, track_id, artist_names, artist_ids, release_date, album_name = name, album_id = id, album_total_tracks = total_tracks, album_type, popularity)
+                select(track_name, track_id, artist_names, artist_ids, release_date, album_name = name, album_id = id, album_total_tracks = total_tracks, album_type, popularity) %>%
+                mutate(
+                    artist_names = sapply(artist_names, function(char_vector) {
+                        paste0(char_vector, collapse = "|")
+                    }),
+                    artist_ids = sapply(artist_ids, function(char_vector) {
+                        paste0(char_vector, collapse = "|")
+                    })
+                )
             return(track_df)
         },
         error = function(e) {
@@ -147,8 +155,6 @@ parse_track_data <- function(track_list) {
         }
     )
 }
-
-
 
 # function to search for tracks by artist name
 get_tracks_by_artist_name <- function(artist, max_tracks = max_limit) {
@@ -192,6 +198,25 @@ get_tracks_by_artist_id <- function(artist_id, market = "US") {
     return(track_data_json)
 }
 
+# function to check if an artist's top tracks JSON response is valid
+is_valid_tracks_response <- function(response, list_name) {
+    # check if response is a valid tracks response
+    is_tracks <- "tracks" %in% names(response)
+    if (!is_tracks) {
+        return(FALSE)
+    }
+
+    # select tracks list
+    if (list_name == "items") {
+        tracks_list <- response$tracks$items
+    } else if (list_name == "tracks") {
+        tracks_list <- response$tracks
+    }
+
+    # check if tracks list is a non-empty list
+    return(length(tracks_list) > 0)
+}
+
 # function to fetch Spotify data for all tracks by all artists
 get_track_data <- function(artist_data, resume_index = 1) {
     # get artist names and IDs
@@ -213,17 +238,30 @@ get_track_data <- function(artist_data, resume_index = 1) {
         track_json <- get_tracks_by_artist_id(artist_id)
 
         # parse track JSON data into a dataframe
-        artist_id_tracks <- track_json %>%
-            pluck("tracks") %>%
-            parse_track_data()
+        if (is_valid_tracks_response(track_json, "tracks")) {
+            artist_id_tracks <- track_json %>%
+                pluck("tracks") %>%
+                parse_track_data()
+        } else {
+            artist_id_tracks <- tibble()
+        }
 
         # search for other tracks by artist
         track_json <- get_tracks_by_artist_name(artist_name)
 
         # parse track JSON data into a dataframe
-        artist_name_tracks <- track_json %>%
-            pluck("tracks", "items") %>%
-            parse_track_data()
+        if (is_valid_tracks_response(track_json, "items")) {
+            artist_name_tracks <- track_json %>%
+                pluck("tracks", "items") %>%
+                parse_track_data()
+        } else {
+            artist_name_tracks <- tibble()
+        }
+
+        # skip if no tracks found
+        if (nrow(artist_id_tracks) == 0 && nrow(artist_name_tracks) == 0) {
+            next
+        }
 
         # combine both track dataframes and filter out duplicates
         artist_tracks <- artist_id_tracks %>%
@@ -238,25 +276,29 @@ get_track_data <- function(artist_data, resume_index = 1) {
 
         # append track dataframe to main dataframe
         track_df <- rbind(track_df, artist_tracks)
+
+        # sleep for one second to avoid rate limiting
+        Sys.sleep(1)
     }
     return(track_df)
 }
 
 
-## Tests
+
+## Data collection
+
+path_to_artists <- "data/artists/"
+path_to_tracks <- "data/tracks/"
 
 # read artist nationality data from CSV
-# artist_data <- read_csv("data/artists/nationalities.csv")
+artist_data <- read_csv(paste0(path_to_artists, "nationalities.csv"))
 
 # get Spotify data for all artists
-# artist_spotify_data <- get_artist_data(artist_data, exact_match = TRUE)
-# View(artist_spotify_data)
+artist_spotify_data <- get_artist_data(artist_data, exact_match = TRUE)
+View(artist_spotify_data)
 
-# write data to CSV
-# write_csv(artist_spotify_data, "data/artists/spotify_data.csv")
-
-# read artist Spotify data from CSV
-artist_spotify_data <- read_csv("data/artists/spotify_data.csv")
+# write artist data to CSV
+write_csv(artist_spotify_data, paste0(path_to_artists, "spotify_data.csv"))
 
 # prioritize the most popular artists from each country for rate limiting purposes
 ranked_artist_data <- artist_spotify_data %>%
@@ -265,26 +307,10 @@ ranked_artist_data <- artist_spotify_data %>%
     ungroup() %>%
     arrange(popularity_rank)
 
-# this function is prone to rate limiting, so we'll set up a resume index for when it fails
-resume_index <- 1
-
 # loop until we get all track data
-track_spotify_data <- get_track_data(ranked_artist_data, resume_index) %>%
+track_spotify_data <- get_track_data(ranked_artist_data, resume_index = 1) %>%
     distinct(track_id, .keep_all = TRUE)
 View(track_spotify_data)
 
-# combine all different dataframes written to file into one
-
-# specify the directory where the CSV files are located
-path_to_tracks <- "data/tracks/"
-
-# get the filenames matching the prefix "spotify_"
-file_names <- list.files(path_to_tracks, pattern = "^spotify_data_.*\\.csv$", full.names = TRUE)
-
-# read and combine the data from CSV files into a single dataframe
-combined_df <- map_df(file_names, read.csv) %>%
-    distinct(track_id, .keep_all = TRUE)
-
-# write the combined dataframe to file
-# note: the vector columns have to be converted to strings before writing to CSV. I did not initially do this and it caused problems when reading the CSV back in. I have fixed this in the parsing code above.
-write_csv(combined_df, paste0(path_to_tracks, "spotify_data.csv"))
+# write track data to file
+write_csv(track_spotify_data, paste0(path_to_tracks, "spotify_data.csv"))
