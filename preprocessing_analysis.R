@@ -92,8 +92,7 @@ collaborative_country_counts <- track_data_clean %>%
     pull(artist_countries) %>%
     unlist() %>%
     table() %>%
-    as.data.frame() %>%
-    arrange(-Freq)
+    as.data.frame()
 colnames(collaborative_country_counts) <- c("country", "collaboration_count")
 
 # compute country appearance frequencies for single-artist tracks
@@ -102,22 +101,96 @@ single_artist_country_counts <- track_data_clean %>%
     pull(artist_countries) %>%
     unlist() %>%
     table() %>%
-    as.data.frame() %>%
-    arrange(-Freq)
+    as.data.frame()
 colnames(single_artist_country_counts) <- c("country", "single_artist_count")
 
 # join the two dataframes to compute the proportion of collaborative tracks for each country
-country_counts_df <- collaborative_country_counts %>%
+country_proportions_df <- collaborative_country_counts %>%
     full_join(single_artist_country_counts, by = "country") %>%
     mutate(
         collaboration_count = replace(collaboration_count, is.na(collaboration_count), 0),
-        collaboration_proportion = collaboration_count / (collaboration_count + single_artist_count)
+        collaboration_proportion = collaboration_count / (collaboration_count + single_artist_count),
+        single_artist_proportion = single_artist_count / (collaboration_count + single_artist_count)
     ) %>%
-    arrange(-collaboration_proportion)
+    arrange(-collaboration_proportion, -single_artist_proportion)
 
-View(country_counts_df)
+View(country_proportions_df)
 
 # 2. Which genres tend to have a higher frequency of collaborations?
-# 3. Is there a correlation between collaboration and artistic success?
-# 4. How does collaboration impact overall artist success?
-# 5. How has collaboration between African artists evolved over time?
+
+# function to return the genres of an artist with the given ID
+get_artist_genres <- function(artist_id, artist_data) {
+    # get genres from artist ID
+    match <- artist_data %>%
+        filter(id %in% artist_id)
+
+    if (nrow(match) > 0) {
+        genres <- pull(match, genres_vector)
+        return(genres)
+    }
+    return(NA)
+}
+
+# subset to tracks whose artists have at least one associated genre
+track_data_clean <- track_data_clean %>%
+    mutate(artist_genres = map(artist_ids_vector, ~ get_artist_genres(.x, artist_data))) %>%
+    filter(!is.na(artist_genres))
+
+View(track_data_clean)
+
+# compute genre appearance frequencies for collaborative tracks
+collaborative_genre_counts <- track_data_clean %>%
+    filter(num_artists > 1) %>%
+    pull(artist_genres) %>%
+    unlist() %>%
+    table() %>%
+    as.data.frame()
+
+colnames(collaborative_genre_counts) <- c("genre", "collaboration_count")
+
+# compute genre appearance frequencies for single-artist tracks
+single_artist_genre_counts <- track_data_clean %>%
+    filter(num_artists == 1) %>%
+    pull(artist_genres) %>%
+    unlist() %>%
+    table() %>%
+    as.data.frame()
+
+colnames(single_artist_genre_counts) <- c("genre", "single_artist_count")
+
+# join the two dataframes to compute the proportion of collaborative tracks for each genre
+genre_proportions_df <- collaborative_genre_counts %>%
+    full_join(single_artist_genre_counts, by = "genre") %>%
+    mutate(
+        collaboration_count = replace(collaboration_count, is.na(collaboration_count), 0),
+        single_artist_count = replace(single_artist_count, is.na(single_artist_count), 0),
+        collaboration_proportion = collaboration_count / (collaboration_count + single_artist_count),
+        single_artist_proportion = single_artist_count / (collaboration_count + single_artist_count)
+    ) %>%
+    arrange(-collaboration_proportion, -single_artist_proportion)
+
+View(genre_proportions_df)
+
+# 3. How has collaboration between African artists evolved over time?
+time_proportions_df <- track_data_clean %>%
+    mutate(
+        release_date_dbl = case_when(
+            str_length(release_date) == 4 ~ as.Date(paste0(release_date, "-01-01")),
+            str_length(release_date) > 4 ~ as.Date(release_date),
+            TRUE ~ NA
+        ),
+        release_year = year(release_date_dbl)
+    ) %>%
+    group_by(release_year) %>%
+    summarise(
+        collaboration_count = sum(num_artists > 1),
+        single_artist_count = sum(num_artists == 1),
+    ) %>%
+    mutate(
+        collaboration_proportion = collaboration_count / (collaboration_count + single_artist_count),
+        single_artist_proportion = single_artist_count / (collaboration_count + single_artist_count)
+    )
+
+View(time_proportions_df)
+
+# 4. Is there a correlation between collaboration and artistic success?
