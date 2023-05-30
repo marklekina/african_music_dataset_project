@@ -2,9 +2,12 @@
 library(tidyverse)
 library(stringr)
 
-# read in data
+# path(s) to input data
 path_to_artists <- "data/artists/"
 path_to_tracks <- "data/tracks/"
+
+# path to output data
+path_to_output <- "data/output/"
 
 artist_spotify_data <- read_csv(paste0(path_to_artists, "spotify_data.csv"))
 track_spotify_data <- read_csv(paste0(path_to_tracks, "spotify_data.csv"))
@@ -19,7 +22,7 @@ glimpse(artist_spotify_data)
 glimpse(track_spotify_data)
 glimpse(nationality_data)
 
-## preprocessing
+## Preprocessing
 
 # function to split `|`-separated strings into vectors
 split_string_lists <- function(string) {
@@ -60,7 +63,7 @@ track_data_dedup <- track_data %>%
     filter(!is_duplicate) %>%
     select(-track_name_processed, -is_duplicate)
 
-## Analysis
+## Preliminary analysis
 
 # 1. Which country's artists have the highest proportion of collaborations?
 
@@ -115,6 +118,10 @@ country_proportions_df <- collaborative_country_counts %>%
     arrange(-collaboration_proportion, -single_artist_proportion)
 
 View(country_proportions_df)
+
+# write to CSV
+write_csv(country_proportions_df, paste0(path_to_output, "collaboration_proportions_by_country.csv"))
+
 
 # 2. Which genres tend to have a higher frequency of collaborations?
 
@@ -171,6 +178,9 @@ genre_proportions_df <- collaborative_genre_counts %>%
 
 View(genre_proportions_df)
 
+# write to CSV
+write_csv(genre_proportions_df, paste0(path_to_output, "collaboration_proportions_by_genre.csv"))
+
 # 3. How has collaboration between African artists evolved over time?
 time_proportions_df <- track_data_clean %>%
     mutate(
@@ -190,7 +200,74 @@ time_proportions_df <- track_data_clean %>%
         collaboration_proportion = collaboration_count / (collaboration_count + single_artist_count),
         single_artist_proportion = single_artist_count / (collaboration_count + single_artist_count)
     )
-
 View(time_proportions_df)
 
-# 4. Is there a correlation between collaboration and artistic success?
+# write to CSV
+write_csv(time_proportions_df, paste0(path_to_output, "collaboration_proportions_by_time.csv"))
+
+
+## Network analysis
+
+# function to compute an adjacency matrix from a dataframe of collaborations
+compute_adjacency_matrix <- function(collaborations_data) {
+    # get all unique artist IDs
+    artist_ids <- collaborations_data %>%
+        pull(artist_ids_vector) %>%
+        unlist() %>%
+        unique()
+
+    # create an empty adjacency matrix
+    adjacency_matrix <- matrix(0, nrow = length(artist_ids), ncol = length(artist_ids))
+    colnames(adjacency_matrix) <- artist_ids
+    rownames(adjacency_matrix) <- artist_ids
+
+    # fill in the adjacency matrix
+    for (i in 1:nrow(collaborations_data)) {
+        artist_ids <- collaborations_data$artist_ids_vector[[i]]
+        for (j in 1:length(artist_ids)) {
+            for (k in 1:length(artist_ids)) {
+                if (j != k) {
+                    adjacency_matrix[artist_ids[j], artist_ids[k]] <- adjacency_matrix[artist_ids[j], artist_ids[k]] + 1
+                }
+            }
+        }
+    }
+    return(adjacency_matrix)
+}
+
+# create an adjacency matrix for the collaboration network
+artist_adj_matrix <- track_data_clean %>%
+    filter(num_artists > 1) %>%
+    compute_adjacency_matrix()
+
+# write the adjacency matrix to a CSV file
+write.csv(artist_adj_matrix, paste0(path_to_output, "artist_adj_matrix.csv"))
+
+# function to get the name or country of artists with the given ID vector
+get_artist_attributes <- function(artist_ids, artist_data, attribute) {
+    artist_attributes <- map_chr(artist_ids, ~ {
+        artist_id <- .x
+        match <- artist_data %>%
+            filter(id %in% artist_id)
+
+        if (nrow(match) > 0) {
+            if (attribute == "name") {
+                return(pull(match, name)[1])
+            } else if (attribute == "country") {
+                return(pull(match, country)[1])
+            }
+        }
+        return(NA)
+    })
+    return(artist_attributes)
+}
+
+# add country attribute to the adjacency matrix
+attr(colnames(artist_adj_matrix), "country") <- get_artist_attributes(colnames(artist_adj_matrix), artist_data, "country")
+
+# subset to collaborations between known African artists
+valid_ids <- !is.na(attr(colnames(artist_adj_matrix), "country"))
+artist_african_adj_matrix <- artist_adj_matrix[valid_ids, valid_ids]
+
+# write the adjacency matrix to a CSV file
+write.csv(artist_african_adj_matrix, paste0(path_to_output, "african_artist_adj_matrix.csv"))
