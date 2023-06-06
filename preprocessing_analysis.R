@@ -1,6 +1,7 @@
 # Libraries
 library(tidyverse)
 library(stringr)
+library(ggplot2)
 
 # path(s) to input data
 path_to_artists <- "data/artists/"
@@ -14,13 +15,13 @@ track_spotify_data <- read_csv(paste0(path_to_tracks, "spotify_data.csv"))
 nationality_data <- read_csv(paste0(path_to_artists, "nationalities.csv"))
 
 # explore the data
-View(artist_spotify_data)
-View(track_spotify_data)
-View(nationality_data)
+# View(artist_spotify_data)
+# View(track_spotify_data)
+# View(nationality_data)
 
-glimpse(artist_spotify_data)
-glimpse(track_spotify_data)
-glimpse(nationality_data)
+# glimpse(artist_spotify_data)
+# glimpse(track_spotify_data)
+# glimpse(nationality_data)
 
 ## Preprocessing
 
@@ -79,7 +80,33 @@ get_country_name <- function(artist_id, artist_nationality_data) {
 
     if (nrow(match) > 0) {
         country_name <- pull(match, country)
-        return(country_name)
+        return(country_name[[1]])
+    }
+    return(NA)
+}
+
+# function to get artist popularity from ID
+get_artist_popularity <- function(artist_id, artist_data) {
+    # get country name from artist ID
+    match <- artist_data %>%
+        filter(id %in% artist_id)
+
+    if (nrow(match) > 0) {
+        artist_popularity <- pull(match, popularity)
+        return(artist_popularity[[1]])
+    }
+    return(NA)
+}
+
+# function to get artist name from ID
+get_artist_name <- function(artist_id, artist_data) {
+    # get country name from artist ID
+    match <- artist_data %>%
+        filter(id %in% artist_id)
+
+    if (nrow(match) > 0) {
+        artist_name <- pull(match, name)
+        return(artist_name[[1]])
     }
     return(NA)
 }
@@ -117,7 +144,21 @@ country_proportions_df <- collaborative_country_counts %>%
     ) %>%
     arrange(-collaboration_proportion, -single_artist_proportion)
 
-View(country_proportions_df)
+# [TABLE] Top 10 countries with the highest proportion of collaborative tracks
+top_10_countries_latex <- country_proportions_df %>%
+    arrange(-collaboration_proportion, ) %>%
+    select(country, collaboration_proportion, collaboration_count) %>%
+    head(10) %>%
+    kable(format = "latex", booktabs = TRUE, caption = "Top 10 countries with the highest proportion of collaborative tracks")
+
+# [TABLE] Top 10 countries with the highest proportion of single-artist tracks
+bottom_10_countries_latex <- country_proportions_df %>%
+    arrange(-single_artist_proportion) %>%
+    select(country, single_artist_proportion, single_artist_count) %>%
+    head(10) %>%
+    kable(format = "latex", booktabs = TRUE, caption = "Top 10 countries with the highest proportion of single-artist tracks")
+
+# View(country_proportions_df)
 
 # write to CSV
 write_csv(country_proportions_df, paste0(path_to_output, "collaboration_proportions_by_country.csv"))
@@ -143,7 +184,7 @@ track_data_clean <- track_data_clean %>%
     mutate(artist_genres = map(artist_ids_vector, ~ get_artist_genres(.x, artist_data))) %>%
     filter(!is.na(artist_genres))
 
-View(track_data_clean)
+# View(track_data_clean)
 
 # compute genre appearance frequencies for collaborative tracks
 collaborative_genre_counts <- track_data_clean %>%
@@ -176,7 +217,22 @@ genre_proportions_df <- collaborative_genre_counts %>%
     ) %>%
     arrange(-collaboration_proportion, -single_artist_proportion)
 
-View(genre_proportions_df)
+# View(genre_proportions_df)
+
+# [TABLE]: Top 10 genres by collaboration proportion
+top_10_genres_latex <- genre_proportions_df %>%
+    arrange(-collaboration_proportion) %>%
+    select(genre, collaboration_proportion, collaboration_count) %>%
+    head(10) %>%
+    kable(format = "latex", booktabs = TRUE, caption = "Top 10 genres by collaboration proportion")
+
+# [TABLE]: Top 10 genres by single-artist proportion
+bottom_10_genres_latex <- genre_proportions_df %>%
+    arrange(-single_artist_proportion) %>%
+    select(genre, single_artist_proportion, single_artist_count) %>%
+    head(10) %>%
+    kable(format = "latex", booktabs = TRUE, caption = "Top 10 genres by single-artist proportion")
+
 
 # write to CSV
 write_csv(genre_proportions_df, paste0(path_to_output, "collaboration_proportions_by_genre.csv"))
@@ -200,11 +256,29 @@ time_proportions_df <- track_data_clean %>%
         collaboration_proportion = collaboration_count / (collaboration_count + single_artist_count),
         single_artist_proportion = single_artist_count / (collaboration_count + single_artist_count)
     )
-View(time_proportions_df)
+# View(time_proportions_df)
 
 # write to CSV
 write_csv(time_proportions_df, paste0(path_to_output, "collaboration_proportions_by_time.csv"))
 
+# [FIGURE] : Proportion of collaborative tracks over time
+# plot the proportion of collaborative tracks over time and save to file
+path_to_figures <- "data/figures/"
+png(filename = paste0(path_to_figures, "collaboration_proportions_by_time.png"), width = 800, height = 600, units = "px")
+time_proportions_df %>%
+    ggplot(aes(x = release_year, y = collaboration_proportion, color = collaboration_count)) +
+    geom_line() +
+    geom_point() +
+    labs(
+        x = "Release year",
+        y = "Proportion of collaborative tracks",
+        color = "# of collaborations"
+    ) +
+    theme_minimal() +
+    theme(
+        legend.position = c(0.2, 0.8)
+    )
+dev.off()
 
 ## Network analysis
 

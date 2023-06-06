@@ -3,3 +3,4 @@ tutorial*
 data/**/*.json
 *test*
 .DS_Store
+**/**/*.log
