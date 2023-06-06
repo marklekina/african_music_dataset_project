@@ -48,18 +48,26 @@ countries_unique <- unique(V(artists_graph)$country)
 country_colors <- rainbow(length(countries_unique))
 node_colors <- country_colors[match(V(artists_graph)$country, countries_unique)]
 
+# get number of artists in graph by country and sort in descending order
+artist_counts <- table(artist_countries)
+artist_counts <- artist_counts[order(artist_counts, decreasing = TRUE)]
+
+# get top 6 countries
+countries_to_include <- names(artist_counts)[1:6]
+
+# filter the colors and labels for the specified countries
+legend_colors <- country_colors[countries_unique %in% countries_to_include]
+legend_labels <- countries_unique[countries_unique %in% countries_to_include]
+
 # specify layout
 layout <- layout_with_fr(artists_graph)
 
 # [FIGURE] : African Artist Network by Country
-# plot the network with country colors and specified layout and save the plot
-# png(paste0(path_to_figures, "african_artist_network_countries.png"), width = 10, height = 7, units = "in", res = 300)
+# plot the network with specified country colors and specified layout and save the plot
+png(paste0(path_to_figures, "african_artist_network_countries.png"), width = 10, height = 7, units = "in", res = 300)
 plot(artists_graph, layout = layout, vertex.size = 5, vertex.label = NA, edge.arrow.size = 0.1, edge.curved = FALSE, edge.width = 1, vertex.color = node_colors)
-legend("bottomright",
-    legend = countries_unique, col = country_colors, pch = 16, title = "Nationalities",
-    bg = "white", border = "black", cex = 0.8, pt.cex = 1.0, title.font = 2, title.col = "black"
-)
-# dev.off()
+legend("bottomright", legend = legend_labels, col = legend_colors, pch = 16, title = "Nationalities", bg = "white", border = "white", cex = 0.8, pt.cex = 1.2, title.font = 2, title.col = "black")
+dev.off()
 
 # 1. Centrality Measures
 
