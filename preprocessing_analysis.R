@@ -266,13 +266,12 @@ write_csv(time_proportions_df, paste0(path_to_output, "collaboration_proportions
 path_to_figures <- "data/figures/"
 png(filename = paste0(path_to_figures, "collaboration_proportions_by_time.png"), width = 800, height = 600, units = "px")
 time_proportions_df %>%
-    ggplot(aes(x = release_year, y = collaboration_proportion, color = collaboration_count)) +
+    ggplot(aes(x = release_year, y = collaboration_proportion)) +
     geom_line() +
     geom_point() +
     labs(
-        x = "Release year",
-        y = "Proportion of collaborative tracks",
-        color = "# of collaborations"
+        x = NULL,
+        y = NULL
     ) +
     theme_minimal() +
     theme(
