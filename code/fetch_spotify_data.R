@@ -20,7 +20,8 @@ read_credentials <- function(credentials_file) {
 }
 
 # read credentials from file
-credentials <- read_credentials("spotify_credentials.txt")
+path_to_credentials <- "~/spotify_credentials.txt"
+credentials <- read_credentials(path_to_credentials)
 
 # set credential environment variables
 Sys.setenv(SPOTIFY_CLIENT_ID = credentials["client_id"])

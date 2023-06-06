@@ -2,6 +2,9 @@
 library(tidyverse)
 library(stringr)
 library(ggplot2)
+library(knitr)
+library(kableExtra)
+
 
 # path(s) to input data
 path_to_artists <- "data/artists/"
@@ -161,7 +164,7 @@ bottom_10_countries_latex <- country_proportions_df %>%
 # View(country_proportions_df)
 
 # write to CSV
-write_csv(country_proportions_df, paste0(path_to_output, "collaboration_proportions_by_country.csv"))
+# write_csv(country_proportions_df, paste0(path_to_output, "collaboration_proportions_by_country.csv"))
 
 
 # 2. Which genres tend to have a higher frequency of collaborations?
@@ -235,7 +238,7 @@ bottom_10_genres_latex <- genre_proportions_df %>%
 
 
 # write to CSV
-write_csv(genre_proportions_df, paste0(path_to_output, "collaboration_proportions_by_genre.csv"))
+# write_csv(genre_proportions_df, paste0(path_to_output, "collaboration_proportions_by_genre.csv"))
 
 # 3. How has collaboration between African artists evolved over time?
 time_proportions_df <- track_data_clean %>%
@@ -259,7 +262,7 @@ time_proportions_df <- track_data_clean %>%
 # View(time_proportions_df)
 
 # write to CSV
-write_csv(time_proportions_df, paste0(path_to_output, "collaboration_proportions_by_time.csv"))
+# write_csv(time_proportions_df, paste0(path_to_output, "collaboration_proportions_by_time.csv"))
 
 # [FIGURE] : Proportion of collaborative tracks over time
 # plot the proportion of collaborative tracks over time and save to file

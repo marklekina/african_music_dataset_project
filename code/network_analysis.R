@@ -8,7 +8,8 @@ library(knitr)
 library(kableExtra)
 
 # load custom functions
-source("preprocessing_analysis.R")
+path_to_code <- "code/"
+# source(paste0(path_to_code, "preprocessing_analysis.R"))
 
 # load network data
 path_to_output <- "data/output/"
@@ -65,8 +66,8 @@ layout <- layout_with_fr(artists_graph)
 # [FIGURE] : African Artist Network by Country
 # plot the network with specified country colors and specified layout and save the plot
 png(paste0(path_to_figures, "african_artist_network_countries.png"), width = 10, height = 7, units = "in", res = 300)
-plot(artists_graph, layout = layout, vertex.size = 5, vertex.label = NA, edge.arrow.size = 0.1, edge.curved = FALSE, edge.width = 1, vertex.color = node_colors)
-legend("bottomright", legend = legend_labels, col = legend_colors, pch = 16, title = "Nationalities", bg = "white", border = "white", cex = 0.8, pt.cex = 1.2, title.font = 2, title.col = "black")
+plot(artists_graph, layout = layout, vertex.size = 6, vertex.label = NA, edge.arrow.size = 0.1, edge.curved = FALSE, edge.width = 1, vertex.color = node_colors)
+legend("bottomright", legend = legend_labels, col = legend_colors, pch = 16, title = "Nationalities", bg = "white", border = "white", cex = 1.0, pt.cex = 1.2, title.font = 2, title.col = "black")
 dev.off()
 
 # 1. Centrality Measures
